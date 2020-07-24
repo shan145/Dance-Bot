@@ -2,6 +2,7 @@ package com.example.dancebot;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.media.Image;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -47,6 +48,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -56,7 +58,11 @@ public class MainActivity extends AppCompatActivity {
     private boolean isTracking;
     private boolean isHitting;
     private ModelLoader modelLoader;
+    private ArrayList<TransformableNode> nodesList = new ArrayList<>();
 
+    /*
+    * onCreate runs upon creation of app
+    */
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -143,9 +149,36 @@ public class MainActivity extends AppCompatActivity {
 
         ImageView igloo = new ImageView(this);
         igloo.setImageResource(R.drawable.igloo_thumb);
-        igloo.setContentDescription("cabin");
+        igloo.setContentDescription("igloo");
         igloo.setOnClickListener(view ->{addObject(Uri.parse("igloo.sfb"));});
         gallery.addView(igloo);
+
+        ImageView cabin = new ImageView(this);
+        cabin.setImageResource(R.drawable.cabin_thumb);
+        cabin.setContentDescription("cabin");
+        cabin.setOnClickListener(view ->{addObject(Uri.parse("cabin.sfb"));});
+        gallery.addView(cabin);
+
+        ImageView house = new ImageView(this);
+        house.setImageResource(R.drawable.house_thumb);
+        house.setContentDescription("house");
+        house.setOnClickListener(view ->{addObject(Uri.parse("house.sfb"));});
+        gallery.addView(house);
+
+        ImageView trash = new ImageView(this);
+        trash.setImageResource(R.drawable.delete);
+        trash.setContentDescription("trash");
+        trash.setOnClickListener(view -> {
+            deleteObjects();
+        });
+        gallery.addView(trash);
+    }
+
+    private void deleteObjects() {
+        for(TransformableNode node: nodesList) {
+            node.setEnabled(false);
+            fragment.getArSceneView().getScene().removeChild(node);
+        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -176,6 +209,7 @@ public class MainActivity extends AppCompatActivity {
         node.setParent(anchorNode);
         fragment.getArSceneView().getScene().addChild(anchorNode);
         node.select();
+        nodesList.add(node);
         startAnimation(node, renderable);
     }
 
