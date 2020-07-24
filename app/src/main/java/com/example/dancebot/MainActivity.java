@@ -1,5 +1,7 @@
 package com.example.dancebot;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,7 +15,10 @@ import com.google.ar.core.Plane;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
 import com.google.ar.sceneform.AnchorNode;
+import com.google.ar.sceneform.ArSceneView;
 import com.google.ar.sceneform.rendering.ModelRenderable;
+import com.google.ar.sceneform.animation.ModelAnimator;
+import com.google.ar.sceneform.rendering.AnimationData;
 import com.google.ar.sceneform.ux.ArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
 
@@ -21,7 +26,12 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.FileProvider;
 
+import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.view.PixelCopy;
 import android.view.View;
 
 import android.view.Menu;
@@ -29,8 +39,15 @@ import android.view.MenuItem;
 import android.view.ViewStructure;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -49,13 +66,7 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+        fab.setOnClickListener(view -> takePhoto());
         fragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.sceneform_fragment);
         fragment.getArSceneView().getScene().addOnUpdateListener(frameTime -> {
             fragment.onUpdate(frameTime);
@@ -118,28 +129,6 @@ public class MainActivity extends AppCompatActivity {
         return new android.graphics.Point(vw.getWidth()/2, vw.getHeight()/2);
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
     @RequiresApi(api = Build.VERSION_CODES.N)
     private void initializeGallery() {
         LinearLayout gallery = findViewById(R.id.gallery_layout);
@@ -177,15 +166,17 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public void addNodeToScene(Anchor anchor, ModelRenderable renderable) {
         AnchorNode anchorNode = new AnchorNode(anchor);
         TransformableNode node = new TransformableNode(fragment.getTransformationSystem());
-        node.getScaleController().setMaxScale(0.5f);
-        node.getScaleController().setMinScale(0.25f);
+        node.getScaleController().setMaxScale(0.75f);
+        node.getScaleController().setMinScale(0.5f);
         node.setRenderable(renderable);
         node.setParent(anchorNode);
         fragment.getArSceneView().getScene().addChild(anchorNode);
         node.select();
+        startAnimation(node, renderable);
     }
 
     public void onException(Throwable throwable){
@@ -195,5 +186,104 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog = builder.create();
         dialog.show();
         return;
+    }
+
+    // Starts animation for Andy
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void startAnimation(TransformableNode node, ModelRenderable renderable) {
+        if(renderable==null || renderable.getAnimationDataCount() == 0) {
+            return;
+        }
+        for(int i = 0; i < renderable.getAnimationDataCount(); i++) {
+            AnimationData animationData = renderable.getAnimationData(i);
+        }
+        ModelAnimator animator = new ModelAnimator(renderable.getAnimationData(0), renderable);
+        animator.start();
+        node.setOnTapListener(
+                ((hitTestResult, motionEvent) -> {
+                    togglePauseAndResume(animator);
+                })
+        );
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    public void togglePauseAndResume(ModelAnimator animator) {
+        if (animator.isPaused()) {
+            animator.resume();
+        } else if (animator.isStarted()) {
+            animator.pause();
+        } else {
+            animator.start();
+        }
+    }
+
+    private String generateFilename() {
+        String date =
+                new SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.getDefault()).format(new Date());
+        return Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES) + File.separator + "Sceneform/" + date + "_screenshot.jpg";
+    }
+
+    private void saveBitmapToDisk(Bitmap bitmap, String filename) throws IOException {
+        File out = new File(filename);
+        if (!out.getParentFile().exists()) {
+            out.getParentFile().mkdirs();
+        }
+        try (FileOutputStream outputStream = new FileOutputStream(filename);
+             ByteArrayOutputStream outputData = new ByteArrayOutputStream()) {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputData);
+            outputData.writeTo(outputStream);
+            outputStream.flush();
+            outputStream.close();
+        } catch (IOException ex) {
+            throw new IOException("Failed to save bitmap to disk", ex);
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private void takePhoto() {
+        final String filename = generateFilename();
+        ArSceneView view = fragment.getArSceneView();
+
+        // Create a bitmap the size of the scene view.
+        final Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(),
+                Bitmap.Config.ARGB_8888);
+
+        // Create a handler thread to offload the processing of the image.
+        final HandlerThread handlerThread = new HandlerThread("PixelCopier");
+        handlerThread.start();
+        // Make the request to copy.
+        PixelCopy.request(view, bitmap, (copyResult) -> {
+            if (copyResult == PixelCopy.SUCCESS) {
+                try {
+                    saveBitmapToDisk(bitmap, filename);
+                } catch (IOException e) {
+                    Toast toast = Toast.makeText(MainActivity.this, e.toString(),
+                            Toast.LENGTH_LONG);
+                    toast.show();
+                    return;
+                }
+                Snackbar snackbar = Snackbar.make(findViewById(android.R.id.content),
+                        "Photo saved", Snackbar.LENGTH_LONG);
+                snackbar.setAction("Open in Photos", v -> {
+                    File photoFile = new File(filename);
+
+                    Uri photoURI = FileProvider.getUriForFile(MainActivity.this,
+                            MainActivity.this.getPackageName() + ".ar.codelab.name.provider",
+                            photoFile);
+                    Intent intent = new Intent(Intent.ACTION_VIEW, photoURI);
+                    intent.setDataAndType(photoURI, "image/*");
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(intent);
+
+                });
+                snackbar.show();
+            } else {
+                Toast toast = Toast.makeText(MainActivity.this,
+                        "Failed to copyPixels: " + copyResult, Toast.LENGTH_LONG);
+                toast.show();
+            }
+            handlerThread.quitSafely();
+        }, new Handler(handlerThread.getLooper()));
     }
 }

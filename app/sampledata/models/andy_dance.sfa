@@ -1,9 +1,12 @@
 {
   animations: [
     {
-      path: 'sampledata/models/andy_dance.fbx',
-    },
-    {
+      clips: [
+        {
+          name: 'Take 001',
+          runtime_name: 'andy_dance',
+        },
+      ],
       path: 'sampledata/models/andy_dance.fbx',
     },
   ],
@@ -41,9 +44,6 @@
           roughnessMap: null,
         },
         {
-          reflectance: 0.5,
-        },
-        {
           opacity: null,
         },
       ],
@@ -51,7 +51,6 @@
     },
   ],
   model: {
-    scale: 0.25,
     attributes: [
       'Position',
       'TexCoord',
@@ -63,7 +62,6 @@
     file: 'sampledata/models/andy_dance.fbx',
     name: 'andy_dance',
     recenter: 'root',
-    scale: 0.026973,
   },
-  version: '0.52:1',
+  version: '0.54:2',
 }

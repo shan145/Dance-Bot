@@ -28,7 +28,6 @@
     },
   ],
   model: {
-    scale: 0.25,
     attributes: [
       'Position',
       'TexCoord',
@@ -40,5 +39,5 @@
     recenter: 'root',
     scale: 0.42322300000000002,
   },
-  version: '0.52:1',
+  version: '0.54:2',
 }
